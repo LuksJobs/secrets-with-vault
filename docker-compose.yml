@@ -1,12 +1,16 @@
 version: '3'
 services:
-  vault_developer:
+  vault_production:
     image: vault:1.6.0
-    container_name: vault_developer
-    ports:
-      - 8200:8200
+    container_name: vault_unimed
     environment:
-      - VAULT_DEV_ROOT_TOKEN_ID=myroottoken
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    restart: always
     volumes:
-      - ./data:/vault/data
-    command: server -dev -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN_ID}
+      - ./private-volume:/vault/file:rw
+      - ./vault:/vault/config:rw
+    cap_add:
+      - IPC_LOCK
+    entrypoint: vault server -config=/vault/config/vault.json
