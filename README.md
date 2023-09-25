@@ -1,5 +1,5 @@
 
-# HashiCorp Vault 
+# HashiCorp Vault :
  
 ## Visão Geral 
 O HashiCorp Vault é uma ferramenta projetada para armazenar e gerenciar informações sensíveis de forma segura, como chaves de API, senhas, certificados e muito mais. Ele fornece uma solução centralizada para gerenciamento de segredos e controle de acesso. 
@@ -38,6 +38,23 @@ O HashiCorp Vault é lançado sob a Licença Pública Mozilla 2.0. Para mais det
 - Site Oficial: [https://www.vaultproject.io/](https://www.vaultproject.io/) 
 - Documentação: [https://www.vaultproject.io/docs/](https://www.vaultproject.io/docs/) 
 - Repositório do GitHub: [https://github.com/hashicorp/vault](https://github.com/hashicorp/vault)
+
+# Instalando o Serviço
+
+Para levantar o serviço, basta rodar o comando abaixo:
+
+```
+$ docker compose up -d
+```
+
+Logo após para gerar as chaves de acesso ao cofre:
+
+```
+$ docker exec -it vault_unimed vault operator init -n 2 -t 2
+```
+
+Esse comando irá gerar duas chaves para acesso ao banco de dados;
+🚩 É de extrema importância guardar as chaves e o Token que foram gerados em um local seguro
 
 # Conexão do NodeJS com o Vault
 
