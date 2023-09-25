@@ -1,0 +1,12 @@
+version: '3'
+services:
+  vault_developer:
+    image: vault:1.6.0
+    container_name: vault_developer
+    ports:
+      - 8200:8200
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=myroottoken
+    volumes:
+      - ./data:/vault/data
+    command: server -dev -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN_ID}
