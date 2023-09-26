@@ -1,5 +1,6 @@
 
-# HashiCorp Vault :
+# HashiCorp Vault 🔒
+ 
  
 ## Visão Geral 
 O HashiCorp Vault é uma ferramenta projetada para armazenar e gerenciar informações sensíveis de forma segura, como chaves de API, senhas, certificados e muito mais. Ele fornece uma solução centralizada para gerenciamento de segredos e controle de acesso. 
@@ -54,7 +55,7 @@ $ docker exec -it vault_unimed vault operator init -n 2 -t 2
 ```
 
 Esse comando irá gerar duas chaves para acesso ao banco de dados;
-🚩 É de extrema importância guardar as chaves e o Token que foram gerados em um local seguro
+🚩 É de extrema importância guardar as chaves e o Token que foram gerados em um local seguro!
 
 # Conexão do NodeJS com o Vault
 
