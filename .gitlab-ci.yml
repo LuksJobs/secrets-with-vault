@@ -1,0 +1,45 @@
+## VAULT de Produção
+# Este projeto é voltado no CI/CD e operações rodando no ambiente de produção em stand alone.
+
+image: harbor.unimednatal.com.br/vault_unimed/unimed/vault:1.0
+
+stages:
+    - build
+    - push
+    - deploy_docker
+
+build:
+    stage: build
+    tags:
+        - vault
+    only:
+        - release/production
+    script:
+        - docker build . -t unimed/vault:1.0
+        - docker tag unimed/vault:1.0 harbor.unimednatal.com.br/vault_unimed/unimed/vault:1.0
+        #buildando uma nova imagem docker e tagueando como "latest"
+                                    
+push:
+    stage: push
+    tags:
+        - vault
+    only:
+        - release/production
+    script:
+        - docker push harbor.unimednatal.com.br/vault_unimed/unimed/vault:1.0
+        #enviando a nova imagem ao repositório do harbor
+    needs: ["build"]
+
+deploy_docker:
+    stage: deploy_docker
+    tags:
+        - vault
+    only:
+        - release/production
+    script:
+        - docker compose up -d --remove-orphans
+        #fazendo deployment da stack em docker swarm, através do compose file;
+    environment:
+      name: staging
+      url: http://10.10.33.23:8200/
+    needs: ["build","push"]
