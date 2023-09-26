@@ -1,7 +1,7 @@
 version: '3'
 services:
   vault_production:
-    image: vault:1.6.0
+    image: harbor.unimednatal.com.br/vault_unimed/unimed/vault:1.0
     container_name: vault_unimed
     environment:
       VAULT_ADDR: http://127.0.0.1:8200
