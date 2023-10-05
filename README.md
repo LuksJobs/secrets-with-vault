@@ -1,7 +1,8 @@
-
 # HashiCorp Vault 🔒
- 
- 
+--- 
+![Diagrama de Conexão](images/DiagramadeConexao2.drawio.png)
+
+
 ## Visão Geral 
 O HashiCorp Vault é uma ferramenta projetada para armazenar e gerenciar informações sensíveis de forma segura, como chaves de API, senhas, certificados e muito mais. Ele fornece uma solução centralizada para gerenciamento de segredos e controle de acesso. 
  
@@ -13,33 +14,6 @@ O HashiCorp Vault é uma ferramenta projetada para armazenar e gerenciar informa
 - **Auditoria e Registro**: O Vault mantém um registro detalhado de todas as interações, fornecendo visibilidade e rastreabilidade para fins de conformidade. 
 - **Integração e Extensibilidade**: Ele se integra a vários sistemas de autenticação, provedores de nuvem, bancos de dados e muito mais. 
  
-## Primeiros Passos 
-Para usar o HashiCorp Vault, siga estes passos: 
- 
-1. **Instalação**: Instale o Vault em seu servidor ou use a imagem oficial do Docker. 
-2. **Inicialização**: Inicie o servidor do Vault para configurar as chaves de criptografia iniciais e o token raiz. 
-3. **Desbloqueio**: Desbloqueie o Vault usando um número mínimo de chaves de desbloqueio para torná-lo operacional. 
-4. **Autenticação**: Configure métodos de autenticação, como tokens, LDAP ou provedores de nuvem, para autenticar usuários e aplicativos. 
-5. **Engine de Segredos**: Habilite e configure engines de segredos para armazenar e gerenciar segredos. 
-6. **Políticas**: Defina políticas de controle de acesso para gerenciar permissões de diferentes usuários e aplicativos. 
-7. **Acesso aos Segredos**: Use a API ou CLI do Vault para interagir com segredos, gerar segredos dinâmicos ou recuperar segredos armazenados. 
-8. **Comunicação Segura**: Configure certificados TLS e comunicação de rede segura para proteger os dados em trânsito. 
-9. **Alta Disponibilidade**: Configure o Vault em uma configuração altamente disponível para redundância e tolerância a falhas. 
-10. **Monitoramento e Auditoria**: Habilite auditoria e monitoramento para rastrear e revisar as atividades do Vault. 
- 
-Para instruções detalhadas e exemplos, consulte a documentação oficial do HashiCorp Vault: [https://www.vaultproject.io/docs/](https://www.vaultproject.io/docs/) 
- 
-## Contribuições 
-Contribuições para o HashiCorp Vault são bem-vindas! Se você encontrar algum problema ou tiver sugestões, por favor, envie-os para o repositório oficial do GitHub: [https://github.com/hashicorp/vault](https://github.com/hashicorp/vault) 
- 
-## Licença 
-O HashiCorp Vault é lançado sob a Licença Pública Mozilla 2.0. Para mais detalhes, consulte o arquivo LICENSE. 
- 
-## Recursos 
-- Site Oficial: [https://www.vaultproject.io/](https://www.vaultproject.io/) 
-- Documentação: [https://www.vaultproject.io/docs/](https://www.vaultproject.io/docs/) 
-- Repositório do GitHub: [https://github.com/hashicorp/vault](https://github.com/hashicorp/vault)
-
 # Instalando o Serviço
 
 Para levantar o serviço, basta rodar o comando abaixo:
@@ -54,8 +28,7 @@ Logo após para gerar as chaves de acesso ao cofre:
 $ docker exec -it vault_unimed vault operator init -n 2 -t 2
 ```
 
-Esse comando irá gerar duas chaves para acesso ao banco de dados;
-🚩 É de extrema importância guardar as chaves e o Token que foram gerados em um local seguro!
+Esse comando irá gerar duas chaves para acesso ao banco de dados, 🚩 é de extrema importância guardar as chaves e o Token que foram gerados em um local seguro!
 
 # Conexão do NodeJS com o Vault
 
@@ -94,3 +67,126 @@ Substitua  `'secret/meuapp/config'`  pelo caminho real para o seu segredo dentro
 5. Agora você pode usar o objeto  dadosSegredo  na sua aplicação para acessar os valores do segredo recuperado. 
  
 Seguindo essas etapas, sua aplicação Node.js será capaz de consumir segredos armazenados no engine "kv" do seu servidor Vault. Lembre-se de tratar erros adequadamente e implementar mecanismos de tratamento de erros e autenticação apropriados, de acordo com os requisitos da sua aplicação.
+
+---
+
+### Comandos Úteis
+
+Para conectar-se ao Vault, via linha de comando é necessário executar o comando abaixo: 
+
+```
+$ export VAULT_ADDR='https://vault.unimednatal.com.br'
+```
+
+Metódo de login utilizando "username" e "password":
+
+```
+$ vault login -method=userpass username=lucas.dantas
+```
+Metódo de login por linha de comando utilizando o "Token":
+
+```
+$ vault login -method=token
+```
+
+### Criando política de acesso 
+
+Política de acesso: `list-secrets-policy.hcl`(arquivo de texto com extensão ".hcl")`
+
+```
+path "secret/metadata"
+{
+  capabilities = [ "list" ]
+}
+
+path "secret/metadata/*"
+{
+  capabilities = [ "list", "read" ]
+}
+
+# Allow a token to manage its own credentials
+path "credentials/*" {
+    capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+# Allow a token to look up its own capabilities on a path
+path "sys/capabilities-self" {
+    capabilities = ["update"]
+}
+
+# Allow general purpose tools
+path "sys/tools/hash" {
+    capabilities = ["update"]
+}
+path "sys/tools/hash/*" {
+    capabilities = ["update"]
+}
+```
+
+Aplicar a política ao Vault: 
+
+```
+vault policy write list-secrets-policy list-secrets-policy.hcl
+```
+
+Aplicar a política aos usuários:
+
+```
+vault write auth/userpass/users/leonardo.matos policies=list-secrets-policy
+vault write auth/userpass/users/lucas.dantas policies=list-secrets-policy
+vault write auth/userpass/users/arquinael.filho policies=list-secrets-policy
+```
+
+---
+
+### Habilitar o APP Role
+
+O AppRole no Vault é um mecanismo de autenticação que permite que aplicativos e serviços se autentiquem e obtenham tokens de acesso para acessar recursos no Vault. Ele fornece uma maneira segura para que aplicativos se autentiquem e obtenham tokens de autenticação sem a necessidade de credenciais de usuário.
+
+```
+vault auth enable approle
+```
+
+Execute o seguinte comando para criar o AppRole "`node-app-role`" e definir as políticas associadas a ele:
+
+```
+vault write auth/approle/role/node-app-role \
+    token_ttl=1h \
+    token_max_ttl=4h \
+    token_policies=default
+
+resultado esperado:
+
+Success! Data written to: auth/approle/role/node-app-role
+```
+
+Após criar o AppRole, você pode obter as informações do "`role-id`" usando o seguinte comando:
+
+```
+vault read auth/approle/role/node-app-role/role-id
+
+resultado esperado:
+
+Key                   Value
+---                   -----
+secret_id             000000000000000000000000000000000000
+secret_id_accessor    000000000000000000000000000000000000
+secret_id_num_uses    0
+secret_id_ttl         0s
+```
+
+Agora iremos gerar um "`secret-id`" para nosso "node-app-role" recentemente criado: 
+
+```
+vault write -f auth/approle/role/node-app-role/secret-id
+
+
+resultado esperado:
+
+Key                   Value
+---                   -----
+secret_id             000000000000000000000000000000000000
+secret_id_accessor    000000000000000000000000000000000000
+secret_id_num_uses    0
+secret_id_ttl         0s
+```
