@@ -4,9 +4,11 @@
 
 
 ## Visão Geral 
+
 O HashiCorp Vault é uma ferramenta projetada para armazenar e gerenciar informações sensíveis de forma segura, como chaves de API, senhas, certificados e muito mais. Ele fornece uma solução centralizada para gerenciamento de segredos e controle de acesso. 
  
 ## Recursos 
+
 - **Gerenciamento de Segredos**: O Vault oferece uma maneira segura de armazenar e gerenciar segredos, garantindo que os dados sensíveis sejam criptografados em repouso e em trânsito. 
 - **Segredos Dinâmicos**: Ele pode gerar segredos dinâmicos sob demanda para vários serviços, reduzindo o risco de credenciais de longa duração. 
 - **Controle de Acesso**: O Vault fornece políticas de controle de acesso detalhadas para restringir e gerenciar o acesso de usuários aos segredos. 
@@ -14,9 +16,131 @@ O HashiCorp Vault é uma ferramenta projetada para armazenar e gerenciar informa
 - **Auditoria e Registro**: O Vault mantém um registro detalhado de todas as interações, fornecendo visibilidade e rastreabilidade para fins de conformidade. 
 - **Integração e Extensibilidade**: Ele se integra a vários sistemas de autenticação, provedores de nuvem, bancos de dados e muito mais. 
  
+# Dockerfile 
+
+A imagem do Vault que iremos utilizar é baseado na imagem base do **Alpine** na versão 3.18 e com a versão do **Vault** 1.13.3
+
+```
+FROM alpine:3.18
+
+# This is the release of Vault to pull in.
+ARG VAULT_VERSION=1.13.3
+
+# Create a vault user and group first so the IDs get set the same way,
+# even as the rest of this may change over time.
+RUN addgroup vault && \
+    adduser -S -G vault vault
+
+# Set up certificates, our base tools, and Vault.
+RUN set -eux; \
+    apk add --no-cache ca-certificates gnupg openssl libcap su-exec dumb-init tzdata && \
+    apkArch="$(apk --print-arch)"; \
+    case "$apkArch" in \
+        armhf) ARCH='arm' ;; \
+        aarch64) ARCH='arm64' ;; \
+        x86_64) ARCH='amd64' ;; \
+        x86) ARCH='386' ;; \
+        *) echo >&2 "error: unsupported architecture: $apkArch"; exit 1 ;; \
+    esac && \
+    VAULT_GPGKEY=C874011F0AB405110D02105534365D9472D7468F; \
+    found=''; \
+    for server in \
+        hkps://keys.openpgp.org \
+        hkps://keyserver.ubuntu.com \
+        hkps://pgp.mit.edu \
+    ; do \
+        echo "Fetching GPG key $VAULT_GPGKEY from $server"; \
+        gpg --batch --keyserver "$server" --recv-keys "$VAULT_GPGKEY" && found=yes && break; \
+    done; \
+    test -z "$found" && echo >&2 "error: failed to fetch GPG key $VAULT_GPGKEY" && exit 1; \
+    mkdir -p /tmp/build && \
+    cd /tmp/build && \
+    wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_${ARCH}.zip && \
+    wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_SHA256SUMS && \
+    wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_SHA256SUMS.sig && \
+    gpg --batch --verify vault_${VAULT_VERSION}_SHA256SUMS.sig vault_${VAULT_VERSION}_SHA256SUMS && \
+    grep vault_${VAULT_VERSION}_linux_${ARCH}.zip vault_${VAULT_VERSION}_SHA256SUMS | sha256sum -c && \
+    unzip -d /tmp/build vault_${VAULT_VERSION}_linux_${ARCH}.zip && \
+    cp /tmp/build/vault /bin/vault && \
+    if [ -f /tmp/build/EULA.txt ]; then mkdir -p /usr/share/doc/vault; mv /tmp/build/EULA.txt /usr/share/doc/vault/EULA.txt; fi && \
+    if [ -f /tmp/build/TermsOfEvaluation.txt ]; then mkdir -p /usr/share/doc/vault; mv /tmp/build/TermsOfEvaluation.txt /usr/share/doc/vault/TermsOfEvaluation.txt; fi && \
+    cd /tmp && \
+    rm -rf /tmp/build && \
+    gpgconf --kill dirmngr && \
+    gpgconf --kill gpg-agent && \
+    apk del gnupg openssl && \
+    rm -rf /root/.gnupg
+
+# /vault/logs is made available to use as a location to store audit logs, if
+# desired; /vault/file is made available to use as a location with the file
+# storage backend, if desired; the server will be started with /vault/config as
+# the configuration directory so you can add additional config files in that
+# location.
+RUN mkdir -p /vault/logs && \
+    mkdir -p /vault/file && \
+    mkdir -p /vault/config && \
+    chown -R vault:vault /vault
+
+# Expose the logs directory as a volume since there's potentially long-running
+# state in there
+VOLUME /vault/logs
+
+# Expose the file directory as a volume since there's potentially long-running
+# state in there
+VOLUME /vault/file
+
+# 8200/tcp is the primary interface that applications use to interact with
+# Vault.
+EXPOSE 8200
+
+# The entry point script uses dumb-init as the top-level process to reap any
+# zombie processes created by Vault sub-processes.
+#
+# For production derivatives of this container, you shoud add the IPC_LOCK
+# capability so that Vault can mlock memory.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# By default you'll get a single-node development server that stores everything
+# in RAM and bootstraps itself. Don't use this configuration for production.
+CMD ["server", "-dev"]
+```
+
+# Buildando a nossa imagem do Vault
+
+Agora que temos nossa imagem definida em nosso Dockerfile, iremos preparar ela buildando nossa imagem:
+
+```
+docker build . -t vault:prd
+```
+
+# Docker Compose
+
+Agora que temos nossa imagem preparada, precisaremos instruir como iremos levantar nosso container Docker e iremos fazer isso utilizando o Docker Compose:
+
+```
+version: '3'
+services:
+  vault_production:
+    image: vault:prd
+    container_name: vault
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    restart: always
+    volumes:
+      - ./private-volume:/vault/file:rw
+      - ./vault:/vault/config:rw
+    cap_add:
+      - IPC_LOCK
+    entrypoint: vault server -config=/vault/config/vault.json
+```
+
+
 # Instalando o Serviço
 
-Para levantar o serviço, basta rodar o comando abaixo:
+Para levantar o container, basta rodar o comando abaixo:
 
 ```
 $ docker compose up -d
@@ -25,7 +149,7 @@ $ docker compose up -d
 Logo após para gerar as chaves de acesso ao cofre:
 
 ```
-$ docker exec -it vault_unimed vault operator init -n 2 -t 2
+$ docker exec -it vault vault operator init -n 2 -t 2
 ```
 
 Esse comando irá gerar duas chaves para acesso ao banco de dados, 🚩 é de extrema importância guardar as chaves e o Token que foram gerados em um local seguro!
@@ -75,7 +199,7 @@ Seguindo essas etapas, sua aplicação Node.js será capaz de consumir segredos 
 Para conectar-se ao Vault, via linha de comando é necessário executar o comando abaixo: 
 
 ```
-$ export VAULT_ADDR='https://vault.unimednatal.com.br'
+$ export VAULT_ADDR='http://seu-servidor-vault:8200'
 ```
 
 Metódo de login utilizando "username" e "password":
